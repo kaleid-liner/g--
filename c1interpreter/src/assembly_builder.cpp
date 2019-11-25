@@ -390,6 +390,9 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             if (!node.initializers.empty()) { // initialize
                 node.initializers[0]->accept(*this);
                 constant = get_const(context, is_result_int, node.is_int, int_const_result, float_const_result);
+            } else {
+                // initialized to zero if no explicit initializer
+                constant = get_const(context, node.is_int, node.is_int, 0, 0);
             }
 
             var = new GlobalVariable(*module, ty, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
