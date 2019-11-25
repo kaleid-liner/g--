@@ -228,7 +228,7 @@ void assembly_builder::visit(cond_syntax &node)
 
 void assembly_builder::visit(binop_expr_syntax &node)
 {
-    if (constexpr_expected = true) {
+    if (constexpr_expected) {
         node.lhs->accept(*this);
         if (is_result_int) {
             int lhs_result = int_const_result;
@@ -284,7 +284,7 @@ void assembly_builder::visit(binop_expr_syntax &node)
 
 void assembly_builder::visit(unaryop_expr_syntax &node)
 {
-    if (constexpr_expected = true) {
+    if (constexpr_expected) {
         node.rhs->accept(*this);
 
         // is_result_int has been set
@@ -349,14 +349,14 @@ void assembly_builder::visit(literal_syntax &node)
 {
     if (node.is_int) {
         is_result_int = true;
-        if (constexpr_expected = true) {
+        if (constexpr_expected) {
             int_const_result = node.intConst;
         } else {
             value_result = builder.getInt32(node.intConst);
         }
     } else {
         is_result_int = false;
-        if (constexpr_expected = true) {
+        if (constexpr_expected) {
             float_const_result = node.floatConst;
         } else {
             value_result = ConstantFP::get(Type::getDoubleTy(context), node.floatConst);
@@ -423,6 +423,10 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
                 elements.push_back(get_const(context, is_result_int, node.is_int, int_const_result, float_const_result));
             }
 
+            for (size_t i = node.initializers.size(); i < length; i++) {
+                elements.push_back(get_const(context, node.is_int, node.is_int, 0, 0)); // fill the rest with 0
+            }
+
             Constant *constant = ConstantArray::get(array_type, elements);
             auto var = new GlobalVariable(array_type, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
             if (!declare_variable(node.name, var, node.is_constant, true, node.is_int)) {
@@ -441,6 +445,11 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
                 auto elementptr = builder.CreateGEP(var, builder.getInt32(i));
                 auto value_conv = auto_conversion(builder, context, value_result, is_result_int, node.is_int);
                 builder.CreateStore(value_conv, elementptr);
+            }
+
+            for (size_t i = node.initializers.size(); i < length; i++) {
+                auto elementptr = builder.CreateGEP(var, builder.getInt32(i));
+                builder.CreateStore(get_const(context, node.is_int, node.is_int, 0, 0));
             }
         }
     }
