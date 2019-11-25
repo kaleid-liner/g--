@@ -531,6 +531,8 @@ void assembly_builder::visit(while_stmt_syntax &node)
     auto loop_body = BasicBlock::Create(context, "BB" + std::to_string(bb_count++), current_function);
     auto next = BasicBlock::Create(context, "BB" + std::to_string(bb_count++), current_function);
 
+    builder.CreateBr(pred);
+
     builder.SetInsertPoint(pred);
     node.pred->accept(*this);
     builder.CreateCondBr(value_result, loop_body, next);
