@@ -310,7 +310,14 @@ void assembly_builder::visit(lval_syntax &node)
         return;
     }
 
+    // make it work with no c++2017 support
+#if __cplusplus >= 201703L
     auto [var_ptr, is_const, is_array, is_int] = lookup_variable(node.name);
+#else
+    Value *var_ptr;
+    bool is_const, is_array, is_int;
+    std::tie(var_ptr, is_const, is_array, is_int) = lookup_variable(node.name);
+#endif
 
     if (is_const && !lval_as_rval) {
         error_flag = true;
