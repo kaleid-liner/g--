@@ -371,9 +371,11 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
         if (in_global) { // x array, global
             constexpr_expected = true;
             
-            node.initializers[0]->accept(*this);
-
-            Constant *constant = get_const(context, is_result_int, node.is_int, int_const_result, float_const_result);
+            Constant *constant = nullptr;
+            if (!node.initializers.empty()) { // initialize
+                node.initializers[0]->accept(*this);
+                constant = get_const(context, is_result_int, node.is_int, int_const_result, float_const_result);
+            }
 
             auto var = new GlobalVariable(ty, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
 
@@ -388,13 +390,16 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
                 err.error(node.line, node.pos, "Variable named '" + node.name + "' already exists");
                 return;
             }
-            constexpr_expected = false;
-            lval_as_rval = true; // evaluate lval
-            node.initializers[0]->accept(*this);
 
-            // do implicit conversion if needed
-            auto value_conv = auto_conversion(builder, context, value_result, is_result_int, node.is_int);
-            builder.CreateStore(value_conv, var);
+            if (!node.initializers.empty()) {
+                constexpr_expected = false;
+                lval_as_rval = true; // evaluate lval
+                node.initializers[0]->accept(*this);
+
+                // do implicit conversion if needed
+                auto value_conv = auto_conversion(builder, context, value_result, is_result_int, node.is_int);
+                builder.CreateStore(value_conv, var);
+            }
         }
     } else {
         constexpr_expected = true;  // array length need to be constexpr
@@ -418,7 +423,7 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             std::vector<Constant *> elements;
 
             constexpr_expected = true;
-            for (auto &initializer : node.initializers) {
+            for (auto &initializer : node.initializers) { // it's ok when initializers is empty
                 initializer->accept(*this);
                 elements.push_back(get_const(context, is_result_int, node.is_int, int_const_result, float_const_result));
             }
@@ -447,9 +452,11 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
                 builder.CreateStore(value_conv, elementptr);
             }
 
-            for (size_t i = node.initializers.size(); i < length; i++) {
-                auto elementptr = builder.CreateGEP(var, builder.getInt32(i));
-                builder.CreateStore(get_const(context, node.is_int, node.is_int, 0, 0));
+            if (!node.initializers.empty()) { // if initializer list is empty, no need to fill the array with zero
+                for (size_t i = node.initializers.size(); i < length; i++) {
+                    auto elementptr = builder.CreateGEP(var, builder.getInt32(i));
+                    builder.CreateStore(get_const(context, node.is_int, node.is_int, 0, 0), elementptr);
+                }
             }
         }
     }
