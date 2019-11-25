@@ -275,7 +275,7 @@ void assembly_builder::visit(binop_expr_syntax &node)
         auto rhs_result = value_result;
         bool is_rhs_int = is_result_int;
 
-        is_result_int = (!is_lhs_int) || (!is_rhs_int); // if one of the operands is float, the result is float
+        is_result_int = is_lhs_int && is_rhs_int; // if one of the operands is float, the result is float
         // lhs, rhs : int/float -> int/float
         lhs_result = auto_conversion(builder, context, lhs_result, is_lhs_int, is_result_int);
         rhs_result = auto_conversion(builder, context, rhs_result, is_rhs_int, is_result_int);
