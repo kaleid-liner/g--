@@ -382,7 +382,7 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
                 constant = get_const(context, is_result_int, node.is_int, int_const_result, float_const_result);
             }
 
-            var = new GlobalVariable(ty, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
+            var = new GlobalVariable(*module, ty, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
         } else { // x array, x global
             var = builder.CreateAlloca(ty, nullptr);
 
@@ -430,7 +430,7 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             }
 
             Constant *constant = ConstantArray::get(array_type, elements);
-            var = new GlobalVariable(array_type, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
+            var = new GlobalVariable(*module, array_type, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
         } else {
             var = builder.CreateAlloca(ty, builder.getInt32(int_const_result));
 
