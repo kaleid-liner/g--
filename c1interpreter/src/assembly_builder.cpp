@@ -424,7 +424,7 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
         int length = int_const_result;
         if (length < node.initializers.size()) {
             error_flag = true;
-            err.error(node.line, node.pos, "Array length shortest than the initializer list");
+            err.error(node.line, node.pos, "Array length shorter than the initializer list");
             return;
         }
         auto array_type = ArrayType::get(ty, length);
