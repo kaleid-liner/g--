@@ -174,7 +174,6 @@ namespace {
 
 void assembly_builder::visit(assembly &node)
 {
-    in_global = true;
     for (auto &def : node.global_defs) {
         def->accept(*this);
     }
@@ -199,8 +198,10 @@ void assembly_builder::visit(func_def_syntax &node)
     auto entry = BasicBlock::Create(context, "BB" + std::to_string(bb_count++), current_function);
     builder.SetInsertPoint(entry);
 
+    in_global = false;
     // deal with scope after entering the block
     node.body->accept(*this); // definition body
+    in_global = true;
 
     builder.CreateRetVoid();
     builder.ClearInsertionPoint(); // To ensure that nothing more is appended to this function
@@ -367,7 +368,11 @@ void assembly_builder::visit(literal_syntax &node)
 void assembly_builder::visit(var_def_stmt_syntax &node)
 {
     auto ty = node.is_int ? Type::getInt32Ty(context) : Type::getDoubleTy(context);
+    Value *var;
+    bool is_array;
+
     if (node.array_length == nullptr) { // not an array
+        is_array = false;
         if (in_global) { // x array, global
             constexpr_expected = true;
             
@@ -377,19 +382,9 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
                 constant = get_const(context, is_result_int, node.is_int, int_const_result, float_const_result);
             }
 
-            auto var = new GlobalVariable(ty, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
-
-            // variables with same name
-            if (!declare_variable(node.name, var, node.is_constant, false, node.is_int)) {
-                err.error(node.line, node.pos, "Symbol '" + node.name + "' already defined");
-            }
+            var = new GlobalVariable(ty, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
         } else { // x array, x global
-            auto var = builder.CreateAlloca(ty, nullptr);
-            if (!declare_variable(node.name, var, node.is_constant, false, node.is_int)) {
-                error_flag = true;
-                err.error(node.line, node.pos, "Variable named '" + node.name + "' already exists");
-                return;
-            }
+            var = builder.CreateAlloca(ty, nullptr);
 
             if (!node.initializers.empty()) {
                 constexpr_expected = false;
@@ -402,6 +397,8 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             }
         }
     } else {
+        is_array = true;
+
         constexpr_expected = true;  // array length need to be constexpr
         node.array_length->accept(*this);
 
@@ -433,14 +430,9 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
             }
 
             Constant *constant = ConstantArray::get(array_type, elements);
-            auto var = new GlobalVariable(array_type, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
-            if (!declare_variable(node.name, var, node.is_constant, true, node.is_int)) {
-                error_flag = true;
-                err.error(node.line, node.pos, "Symbol '" + node.name + "' already defined");
-                return;
-            }
+            var = new GlobalVariable(array_type, node.is_constant, GlobalValue::ExternalLinkage, constant, node.name);
         } else {
-            auto var = builder.CreateAlloca(ty, builder.getInt32(int_const_result));
+            var = builder.CreateAlloca(ty, builder.getInt32(int_const_result));
 
             constexpr_expected = false;
             lval_as_rval = true;
@@ -459,6 +451,12 @@ void assembly_builder::visit(var_def_stmt_syntax &node)
                 }
             }
         }
+    }
+
+    if (!declare_variable(node.name, var, node.is_constant, is_array, node.is_int)) {
+        error_flag = true;
+        err.error(node.line, node.pos, "Variable named '" + node.name + "' already exists");
+        return;
     }
 }
 
