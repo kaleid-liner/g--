@@ -324,9 +324,12 @@ void assembly_builder::visit(lval_syntax &node)
             err.error(node.line, node.pos, "Expected index but not found");
             return;
         } else {
-            lval_as_rval = true; // lval should be evaluated
+            bool lval_as_rval_tmp = lval_as_rval;
+            lval_as_rval = true; // lval should be evaluated in index
             constexpr_expected = false;
             node.array_index->accept(*this);
+            lval_as_rval = lval_as_rval_tmp; // restore lval_as_rval
+
             if (!is_result_int) {
                 error_flag = true;
                 err.error(node.line, node.pos, "Array index must be an integer");
